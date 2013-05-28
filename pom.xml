@@ -10,6 +10,7 @@
 		<module>client</module>
 		<module>common</module>
 		<module>server</module>
+		<module>standalone</module>
 	</modules>
 
 	<dependencyManagement>
