@@ -1,3 +1,7 @@
+# Fork
+
+This fork is merely for packaging purposes.
+
 # Getting started
 
 Build the project using [Apache Maven] (http://maven.apache.org/):
