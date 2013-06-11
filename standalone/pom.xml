@@ -15,10 +15,6 @@
         <jetty.version>9.0.3.v20130506</jetty.version>
         <maven-shade-plugin.version>2.0</maven-shade-plugin.version>
         <config.version>1.0.1</config.version>
-        <slf4j.version>1.7.5</slf4j.version>
-        <logback.version>1.0.13</logback.version>
-        <lombok.version>0.11.8</lombok.version>
-        <jersey.version>1.17.1</jersey.version>
     </properties>
 
     <dependencies>
@@ -63,6 +59,29 @@
             <version>${logback.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>metrics-core</artifactId>
+            <version>${metrics.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>metrics-servlets</artifactId>
+            <version>${metrics.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.inject.extensions</groupId>
+            <artifactId>guice-servlet</artifactId>
+            <version>${guice.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.inject.extensions</groupId>
+            <artifactId>guice-multibindings</artifactId>
+            <version>${guice.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.projectlombok</groupId>

@@ -3,26 +3,51 @@
  */
 package org.openscoring.server;
 
-import java.io.*;
-import java.util.*;
+import com.codahale.metrics.annotation.Metered;
+import com.codahale.metrics.annotation.Timed;
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import com.google.inject.name.Named;
+import com.sun.jersey.api.NotFoundException;
+import lombok.extern.slf4j.Slf4j;
+import org.dmg.pmml.FieldName;
+import org.dmg.pmml.PMML;
+import org.jpmml.evaluator.Evaluator;
+import org.jpmml.evaluator.EvaluatorUtil;
+import org.jpmml.evaluator.ModelEvaluatorFactory;
+import org.jpmml.manager.IOUtil;
+import org.jpmml.manager.PMMLManager;
+import org.openscoring.common.EvaluationRequest;
+import org.openscoring.common.EvaluationResponse;
+import org.openscoring.common.SummaryResponse;
 
-import javax.servlet.http.*;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.*;
-import javax.ws.rs.core.*;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
-import org.openscoring.common.*;
-
-import org.jpmml.evaluator.*;
-import org.jpmml.manager.*;
-
-import org.dmg.pmml.*;
-
-import com.sun.jersey.api.*;
-
+@Slf4j
+@Singleton
 @Path("model")
 public class ModelService {
 
+    private final Map<String, PMML> cache;
+
+    @Inject
+    protected ModelService(@Named("pmml-model-cache") final Map<String, PMML> cache) {
+        this.cache = cache;
+    }
+
 	@PUT
+    @Timed
+    @Metered
 	@Path("{id}")
 	@Consumes({MediaType.APPLICATION_XML, MediaType.TEXT_XML})
 	@Produces(MediaType.TEXT_PLAIN)
@@ -37,28 +62,30 @@ public class ModelService {
 			} finally {
 				is.close();
 			}
-		} catch(Exception e){
+		} catch (Exception e) {
 			throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
 		}
 
-		ModelService.cache.put(id, pmml);
+		cache.put(id, pmml);
 
 		return "Model " + id + " deployed successfully";
 	}
 
 	@GET
+    @Timed
 	@Produces(MediaType.APPLICATION_JSON)
 	public List<String> getDeployedIds(){
-		List<String> result = new ArrayList<String>(ModelService.cache.keySet());
+		List<String> result = new ArrayList<String>(cache.keySet());
 
 		return result;
 	}
 
 	@GET
+    @Timed
 	@Path("{id}")
 	@Produces(MediaType.APPLICATION_JSON)
 	public SummaryResponse getSummary(@PathParam("id") String id){
-		PMML pmml = ModelService.cache.get(id);
+		PMML pmml = cache.get(id);
 		if(pmml == null){
 			throw new NotFoundException();
 		}
@@ -89,11 +116,13 @@ public class ModelService {
 	}
 
 	@POST
+    @Timed
+    @Metered
 	@Path("{id}/batch")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public List<EvaluationResponse> evaluateBatch(@PathParam("id") String id, List<EvaluationRequest> requests){
-		PMML pmml = ModelService.cache.get(id);
+		PMML pmml = cache.get(id);
 		if(pmml == null){
 			throw new NotFoundException();
 		}
@@ -107,6 +136,8 @@ public class ModelService {
 
 			for(EvaluationRequest request : requests){
 				EvaluationResponse response = evaluate(evaluator, request);
+                log.info("Evaluating model {} for request {} with result {}", id, request.toString(),
+                        response.toString());
 
 				responses.add(response);
 			}
@@ -118,10 +149,11 @@ public class ModelService {
 	}
 
 	@DELETE
+    @Timed
 	@Path("{id}")
 	@Produces(MediaType.TEXT_PLAIN)
 	public String undeploy(@PathParam("id") String id){
-		PMML pmml = ModelService.cache.remove(id);
+		PMML pmml = cache.remove(id);
 		if(pmml == null){
 			throw new NotFoundException();
 		}
@@ -160,6 +192,4 @@ public class ModelService {
 
 		return result;
 	}
-
-	private static final Map<String, PMML> cache = new HashMap<String, PMML>();
 }
