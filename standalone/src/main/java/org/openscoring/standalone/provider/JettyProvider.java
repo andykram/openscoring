@@ -1,22 +1,24 @@
 package org.openscoring.standalone.provider;
 
 import com.codahale.metrics.servlets.AdminServletContextListener;
+import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
 import com.google.inject.Provider;
 import com.google.inject.name.Named;
 import com.google.inject.servlet.GuiceFilter;
 import com.google.inject.servlet.GuiceServletContextListener;
+import com.sun.jersey.spi.container.servlet.ServletContainer;
 import com.typesafe.config.Config;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.util.component.AbstractLifeCycle;
-import org.eclipse.jetty.util.component.LifeCycle;
-import org.openscoring.standalone.metrics.reporter.AggregateScheduledReporter;
+import org.eclipse.jetty.servlet.ServletHolder;
 import org.openscoring.standalone.servlets.GuiceAdminServletContextListener;
 
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
 
 public class JettyProvider implements Provider<Server> {
     private final Injector injector;
@@ -37,20 +39,32 @@ public class JettyProvider implements Provider<Server> {
     @Override
     public Server get() {
         final Server server = new Server(port);
-        final ServletContextHandler handler = new ServletContextHandler();
-        handler.setContextPath(path);
-        handler.addFilter(GuiceFilter.class, "/*", null);
+        final ContextHandlerCollection handlers = new ContextHandlerCollection();
 
-        handler.addEventListener(new GuiceServletContextListener() {
+        final ServletContextHandler servletHandler = new ServletContextHandler();
+        servletHandler.setContextPath(path);
+        servletHandler.addFilter(GuiceFilter.class, "/*", null);
+
+        servletHandler.addEventListener(new GuiceServletContextListener() {
             @Override
             protected Injector getInjector() {
                 return injector;
             }
         });
-        handler.addEventListener(adminServletContextListener);
-        handler.addServlet(DefaultServlet.class, "/");
+        servletHandler.addEventListener(adminServletContextListener);
+        servletHandler.addServlet(DefaultServlet.class, "/");
 
-        server.setHandler(handler);
+        final ServletContextHandler healthHandler = new ServletContextHandler();
+        final ServletHolder healthHolder = new ServletHolder();
+        healthHolder.setInitParameters(ImmutableMap.<String, String>of(
+                "com.sun.jersey.config.property.packages", "org.openscoring.standalone.health",
+                "com.sun.jersey.api.json.POJOMappingFeature", "true"
+        ));
+        healthHolder.setServlet(new ServletContainer());
+        healthHandler.addServlet(healthHolder, "/*");
+
+        handlers.setHandlers(new Handler[]{ healthHandler, servletHandler });
+        server.setHandler(handlers);
 
         return server;
     }

@@ -136,6 +136,16 @@ public class StatsDReporter extends StructuredScheduledReporter {
         try {
             statsd.connect();
             super.report(gauges, counters, histograms, meters, timers);
+            LOG.info(String.format("Reported %d gauges, " +
+                                           "%d counters, " +
+                                           "%d histograms, " +
+                                           "%d meters " +
+                                           "and %d timers to StatsD",
+                                   gauges.size(),
+                                   counters.size(),
+                                   histograms.size(),
+                                   meters.size(),
+                                   timers.size()));
         } catch (IOException e) {
             LOG.warn("Error preparing StatsD for write", e);
         } catch (RuntimeException e) {
@@ -143,6 +153,7 @@ public class StatsDReporter extends StructuredScheduledReporter {
         } finally {
             try {
                 statsd.close();
+                LOG.debug("Closed StatsD connection");
             } catch (IOException e) {
                 LOG.warn("Error closing StatsD", statsd, e);
             }
