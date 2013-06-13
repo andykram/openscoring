@@ -47,7 +47,7 @@ public class ModelService {
 
 	@PUT
     @Timed
-    @Metered
+    @Metered(name="deploy-meter")
 	@Path("{id}")
 	@Consumes({MediaType.APPLICATION_XML, MediaType.TEXT_XML})
 	@Produces(MediaType.TEXT_PLAIN)
@@ -117,7 +117,7 @@ public class ModelService {
 
 	@POST
     @Timed
-    @Metered
+    @Metered(name = "evaluate-batch-meter")
 	@Path("{id}/batch")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)

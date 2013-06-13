@@ -40,6 +40,11 @@
 				<artifactId>server</artifactId>
 				<version>${version}</version>
 			</dependency>
+      <dependency>
+        <groupId>org.openscoring</groupId>
+        <artifactId>standalone</artifactId>
+        <version>${version}</version>
+      </dependency>
 		</dependencies>
 	</dependencyManagement>
 

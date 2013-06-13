@@ -59,29 +59,46 @@
             <version>${logback.version}</version>
         </dependency>
 
+        <!-- Metrics Dependencies -->
         <dependency>
             <groupId>com.codahale.metrics</groupId>
             <artifactId>metrics-core</artifactId>
             <version>${metrics.version}</version>
         </dependency>
-
+        <dependency>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>metrics-jvm</artifactId>
+            <version>${metrics.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.codahale.metrics</groupId>
             <artifactId>metrics-servlets</artifactId>
             <version>${metrics.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>metrics-servlet</artifactId>
+            <version>${metrics.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>metrics-jersey</artifactId>
+            <version>${metrics.version}</version>
+        </dependency>
+        <!--// Metrics Dependencies -->
 
+        <!-- Guice Dependencies -->
         <dependency>
             <groupId>com.google.inject.extensions</groupId>
             <artifactId>guice-servlet</artifactId>
             <version>${guice.version}</version>
         </dependency>
-
         <dependency>
             <groupId>com.google.inject.extensions</groupId>
             <artifactId>guice-multibindings</artifactId>
             <version>${guice.version}</version>
         </dependency>
+        <!--// Guice Dependencies -->
 
         <dependency>
             <groupId>org.projectlombok</groupId>
