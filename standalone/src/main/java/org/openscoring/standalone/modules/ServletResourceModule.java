@@ -17,6 +17,7 @@ import com.typesafe.config.Config;
 import org.codehaus.jackson.jaxrs.JacksonJsonProvider;
 import org.dmg.pmml.PMML;
 import org.openscoring.server.ModelService;
+import org.openscoring.standalone.resources.BasicHealthResource;
 
 import javax.ws.rs.core.UriBuilder;
 import java.util.Map;
@@ -39,6 +40,7 @@ public class ServletResourceModule extends ServletModule {
         bind(HealthCheckServlet.class).in(Singleton.class);
         bind(InstrumentedFilter.class).in(Singleton.class);
         bind(ModelService.class);
+        bind(BasicHealthResource.class);
 
         filter("/*").through(InstrumentedFilter.class);
         serve(metricsPath("threads")).with(ThreadDumpServlet.class);
