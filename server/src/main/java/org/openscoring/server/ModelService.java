@@ -108,6 +108,8 @@ public class ModelService {
 	}
 
 	@POST
+    @Timed
+    @Metered(name = "evaluate-meter")
 	@Path("{id}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
