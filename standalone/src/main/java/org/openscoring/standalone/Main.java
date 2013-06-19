@@ -2,6 +2,7 @@ package org.openscoring.standalone;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Stage;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +22,11 @@ import java.util.concurrent.TimeUnit;
 public class Main {
     public static void main(String[] args) throws Exception {
         final Config baseConfig = ConfigFactory.load();
+        final boolean inProduction = baseConfig.getBoolean("openscoring.productionEnv");
+        final Stage stage = inProduction ? Stage.PRODUCTION : Stage.DEVELOPMENT;
+
         final Injector injector = Guice.createInjector(
+                stage,
                 new ConfigModule(baseConfig),
                 new ServerModule(),
                 new MetricsModule(),
