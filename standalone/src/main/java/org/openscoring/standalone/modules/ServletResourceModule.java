@@ -7,7 +7,9 @@ import com.codahale.metrics.servlets.HealthCheckServlet;
 import com.codahale.metrics.servlets.MetricsServlet;
 import com.codahale.metrics.servlets.PingServlet;
 import com.codahale.metrics.servlets.ThreadDumpServlet;
+import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Table;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.name.Named;
@@ -59,8 +61,8 @@ public class ServletResourceModule extends ServletModule {
     @Provides
     @Singleton
     @Named("pmml-model-cache")
-    protected Map<String, PMML> provideModelCache() {
-        return Maps.newConcurrentMap();
+    protected Table<String, Integer, PMML> provideModelCache() {
+        return HashBasedTable.create();
     }
 
     @Provides

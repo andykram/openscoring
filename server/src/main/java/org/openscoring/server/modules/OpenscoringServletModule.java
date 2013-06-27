@@ -1,6 +1,8 @@
 package org.openscoring.server.modules;
 
+import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Table;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.name.Named;
@@ -26,7 +28,7 @@ public class OpenscoringServletModule extends ServletModule {
     @Provides
     @Singleton
     @Named("pmml-model-cache")
-    protected Map<String, PMML> provideModelCache() {
-        return Maps.newHashMap();
+    protected Table<String, Integer, PMML> provideModelCache() {
+        return HashBasedTable.create();
     }
 }

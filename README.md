@@ -1,6 +1,8 @@
 # Fork
 
-This fork is merely for packaging purposes.
+This fork was originally only for packaging purposes. Since then, we've
+added a number of new features including Dependency Injection via Guice
+and versions of models.
 
 # Getting started
 
