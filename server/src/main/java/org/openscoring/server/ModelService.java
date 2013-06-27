@@ -56,8 +56,8 @@ public class ModelService {
 	public String deploy(@PathParam("id") String id, @Context HttpServletRequest request){
 		Map<Integer, PMML> row = cache.row(id);
         TreeSet<Integer> sortedVersions = Sets.newTreeSet(row.keySet());
-
-        return deploy(id, sortedVersions.last() + 1, request);
+        Integer version = sortedVersions.isEmpty() ? 1 : (sortedVersions.last() + 1);
+        return deploy(id, version, request);
 	}
 
     @PUT
