@@ -8,7 +8,7 @@ import java.util.*;
 public class EvaluationRequest {
 
 	private Map<String, ?> parameters = null;
-
+    private String id = null;
 
 	public Object getParameter(String key){
 		return this.parameters.get(key);
@@ -21,4 +21,12 @@ public class EvaluationRequest {
 	public void setParameters(Map<String, ?> parameters){
 		this.parameters = parameters;
 	}
+
+    public String getId() {
+        return this.id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
 }

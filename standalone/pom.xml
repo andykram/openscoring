@@ -13,7 +13,7 @@
 
     <properties>
         <jetty.version>9.0.3.v20130506</jetty.version>
-        <maven-shade-plugin.version>2.0</maven-shade-plugin.version>
+        <maven-shade-plugin.version>2.1</maven-shade-plugin.version>
         <config.version>1.0.1</config.version>
     </properties>
 
