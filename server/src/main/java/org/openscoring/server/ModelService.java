@@ -5,25 +5,22 @@ package org.openscoring.server;
 
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.common.collect.Table;
+import com.google.common.collect.*;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.google.inject.name.Named;
 import com.sun.jersey.api.NotFoundException;
 import lombok.extern.slf4j.Slf4j;
-import org.dmg.pmml.FieldName;
-import org.dmg.pmml.PMML;
+import org.dmg.pmml.*;
 import org.jpmml.evaluator.Evaluator;
 import org.jpmml.evaluator.EvaluatorUtil;
 import org.jpmml.evaluator.ModelEvaluatorFactory;
-import org.jpmml.manager.IOUtil;
 import org.jpmml.manager.PMMLManager;
 import org.openscoring.common.EvaluationRequest;
 import org.openscoring.common.EvaluationResponse;
 import org.openscoring.common.SummaryResponse;
+import org.openscoring.server.responses.ThresholdEvaluationResponse;
+import org.openscoring.server.responses.ThresholdSummaryResponse;
 import org.openscoring.server.responses.VersionedEvaluationResponse;
 import org.openscoring.server.responses.VersionedSummaryResponse;
 
@@ -53,10 +50,11 @@ public class ModelService {
 	@Path("{id}")
 	@Consumes({MediaType.APPLICATION_XML, MediaType.TEXT_XML})
 	@Produces(MediaType.TEXT_PLAIN)
-	public String deploy(@PathParam("id") String id, @Context HttpServletRequest request){
+	public Response deploy(@PathParam("id") String id, @Context HttpServletRequest request){
 		Map<Integer, PMML> row = cache.row(id);
         TreeSet<Integer> sortedVersions = Sets.newTreeSet(row.keySet());
         Integer version = sortedVersions.isEmpty() ? 1 : (sortedVersions.last() + 1);
+
         return deploy(id, version, request);
 	}
 
@@ -66,13 +64,15 @@ public class ModelService {
     @Path("{id}/{version}")
     @Consumes({MediaType.APPLICATION_XML, MediaType.TEXT_XML})
     @Produces(MediaType.TEXT_PLAIN)
-    public String deploy(@PathParam("id") String id,
+    public Response deploy(@PathParam("id") String id,
                          @PathParam("version") Integer version,
                          @Context HttpServletRequest request) {
         PMML pmml;
 
         if (cache.contains(id, version)) {
-            return "Model versions cannot be updated";
+            return Response.status(Response.Status.CONFLICT)
+                           .entity("Model versions cannot be updated")
+                           .build();
         }
 
         try {
@@ -87,18 +87,24 @@ public class ModelService {
             throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
         }
 
-        cache.put(id, version, pmml);
+        if (getThreshold(pmml.getHeader()) == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                           .entity("Model must have threshold")
+                           .build();
+        } else {
+            cache.put(id, version, pmml);
 
-        return "Model " + id + " deployed successfully";
+            return Response.status(Response.Status.OK)
+                           .entity("Model " + id + " deployed successfully")
+                           .build();
+        }
     }
 
 	@GET
     @Timed
 	@Produces(MediaType.APPLICATION_JSON)
 	public List<String> getDeployedIds(){
-		List<String> result = new ArrayList<String>(cache.rowKeySet());
-
-		return result;
+        return new ArrayList<String>(cache.rowKeySet());
 	}
 
 	@GET
@@ -106,7 +112,7 @@ public class ModelService {
 	@Path("{id}")
 	@Produces(MediaType.APPLICATION_JSON)
 	public VersionedSummaryResponse getSummary(@PathParam("id") String id){
-        Map<Integer, PMML> modelVersions = cache.row(id);
+        final Map<Integer, PMML> modelVersions = cache.row(id);
 
 		if (modelVersions.isEmpty()) {
 			throw new NotFoundException();
@@ -115,16 +121,19 @@ public class ModelService {
         VersionedSummaryResponse response = new VersionedSummaryResponse(id);
 
         for (Map.Entry<Integer, PMML> modelVersion: modelVersions.entrySet()) {
-            SummaryResponse modelResponse = new SummaryResponse();
+            final ThresholdSummaryResponse modelResponse = new ThresholdSummaryResponse();
+            final PMML model = modelVersion.getValue();
+            final Threshold threshold = getThreshold(model.getHeader());
 
             try {
-                PMMLManager pmmlManager = new PMMLManager(modelVersion.getValue());
+                PMMLManager pmmlManager = new PMMLManager(model);
                 Evaluator evaluator = (Evaluator)pmmlManager.getModelManager(null,
                                                                              ModelEvaluatorFactory.getInstance());
                 modelResponse.setActiveFields(toValueList(evaluator.getActiveFields()));
                 modelResponse.setPredictedFields(toValueList(evaluator.getPredictedFields()));
                 modelResponse.setOutputFields(toValueList(evaluator.getOutputFields()));
-            } catch (Exception e) {}
+                modelResponse.setThreshold(threshold);
+            } catch (Exception ignored) {}
 
             response.setSummaryResponse(modelVersion.getKey(), modelResponse);
         }
@@ -140,15 +149,17 @@ public class ModelService {
 	@Produces(MediaType.APPLICATION_JSON)
 	public VersionedEvaluationResponse evaluate(@PathParam("id") String id, EvaluationRequest request) {
         Map<Integer, PMML> versions = cache.row(id);
-        Map<Integer, EvaluationResponse> modelResponses = Maps.newHashMap();
+        Map<Integer, ThresholdEvaluationResponse> modelResponses = Maps.newHashMap();
 
         VersionedEvaluationResponse response = new VersionedEvaluationResponse(id);
 
         for (Map.Entry<Integer, PMML> modelVersion: versions.entrySet()) {
-            VersionedEvaluationResponse result = evaluateBatchVersion(id,
-                                                                      modelVersion.getKey(),
-                                                                      Collections.singletonList(request)).get(0);
-            modelResponses.putAll(result.getResult());
+            try {
+                VersionedEvaluationResponse result = evaluateBatchVersion(id,
+                                                                          modelVersion.getKey(),
+                                                                          Collections.singletonList(request)).get(0);
+                modelResponses.putAll(result.getResult());
+            } catch (Exception ignored) {}
         }
 
         response.setResult(modelResponses);
@@ -167,10 +178,12 @@ public class ModelService {
         List<VersionedEvaluationResponse> responses = Lists.newArrayList();
 
         for (Map.Entry<Integer, PMML> modelVersion: versions.entrySet()) {
-            List<VersionedEvaluationResponse> result = evaluateBatchVersion(id,
-                                                                            modelVersion.getKey(),
-                                                                            requests);
-            responses.addAll(result);
+            try {
+                List<VersionedEvaluationResponse> result = evaluateBatchVersion(id,
+                                                                                modelVersion.getKey(),
+                                                                                requests);
+                responses.addAll(result);
+            } catch (Exception ignored) {}
         }
 
         return responses;
@@ -186,10 +199,12 @@ public class ModelService {
                                                                   @PathParam("version") Integer version,
                                                                   List<EvaluationRequest> requests){
 
-		PMML pmml = cache.get(id, version);
+		final PMML pmml = cache.get(id, version);
 		if(pmml == null){
 			throw new NotFoundException();
 		}
+
+        final Threshold threshold = getThreshold(pmml.getHeader());
 
 		List<VersionedEvaluationResponse> responses = Lists.newArrayList();
 
@@ -200,16 +215,21 @@ public class ModelService {
                                                                          ModelEvaluatorFactory.getInstance());
 
 			for(EvaluationRequest request : requests){
-				EvaluationResponse response = evaluate(evaluator, request);
+                log.info("Evaluating request parameters {} with UUID {}", request.getParameters(), request.getId());
 
-                Map<Integer, EvaluationResponse> responseMap = Maps.newHashMap();
-                responseMap.put(version, response);
+				ThresholdEvaluationResponse response = ThresholdEvaluationResponse.fromEvaluationResponse(evaluate(evaluator,
+                                                                                                                   request));
+                response.setThreshold(threshold);
 
-                VersionedEvaluationResponse versionedResponse = new VersionedEvaluationResponse(id, responseMap);
+                Map<Integer, ThresholdEvaluationResponse> responseMap = ImmutableMap.of(version, response);
 
-                log.info("Evaluating model {} for request {} with result {}", id,
+                VersionedEvaluationResponse versionedResponse = new VersionedEvaluationResponse(id);
+                versionedResponse.setResult(responseMap);
+
+                log.info("Evaluated model {} for request {} with result {} with UUID {}", id,
                          request.getParameters(),
-                         response.getResult());
+                         response.getResult(),
+                         request.getId());
 
 				responses.add(versionedResponse);
 			}
@@ -277,4 +297,25 @@ public class ModelService {
 
 		return result;
 	}
+
+    static private Threshold getThreshold(final Header header) {
+        final List<Extension> extensions = header.getExtensions();
+        Float upper = null;
+        Float lower = null;
+
+        try {
+            for (Extension extension : extensions) {
+                if (extension.getName().equals("true_if_above")) {
+                    upper = Float.valueOf(extension.getValue());
+                } else if (extension.getName().equals("true_if_below")) {
+                    lower = Float.valueOf(extension.getValue());
+                }
+            }
+
+            return new Threshold(lower, upper);
+
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
 }

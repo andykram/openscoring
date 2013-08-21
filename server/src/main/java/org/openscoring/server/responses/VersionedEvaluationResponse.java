@@ -1,35 +1,13 @@
 package org.openscoring.server.responses;
 
+import lombok.Data;
 import org.openscoring.common.EvaluationResponse;
+import org.openscoring.server.Threshold;
 
 import java.util.Map;
 
+@Data
 public class VersionedEvaluationResponse {
-    protected Map<Integer, EvaluationResponse> result = null;
-    protected String modelName;
-
-    public VersionedEvaluationResponse() {}
-    public VersionedEvaluationResponse(String modelName) {
-        this.modelName = modelName;
-    }
-    public VersionedEvaluationResponse(String modelName, Map<Integer, EvaluationResponse> result) {
-        this(modelName);
-        this.result = result;
-    }
-
-    public Map<Integer, EvaluationResponse> getResult() {
-        return this.result;
-    }
-
-    public void setResult(Map<Integer, EvaluationResponse> result) {
-        this.result = result;
-    }
-
-    public String getModelName() {
-        return this.modelName;
-    }
-
-    public void setModelName(String modelName) {
-        this.modelName = modelName;
-    }
+    private final String modelName;
+    private Map<Integer, ThresholdEvaluationResponse> result;
 }
