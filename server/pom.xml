@@ -7,12 +7,11 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <groupId>org.openscoring</groupId>
     <artifactId>server</artifactId>
     <packaging>${server.packaging}</packaging>
 
     <properties>
-        <pmml-evaluator.version>1.0.5</pmml-evaluator.version>
+        <pmml-evaluator.version>1.0.13</pmml-evaluator.version>
     </properties>
 
     <dependencies>
