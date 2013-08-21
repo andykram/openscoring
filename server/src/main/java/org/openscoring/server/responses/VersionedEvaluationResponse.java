@@ -9,6 +9,5 @@ import java.util.Map;
 @Data
 public class VersionedEvaluationResponse {
     private final String modelName;
-    private Map<Integer, EvaluationResponse> result;
-    private Threshold threshold;
+    private Map<Integer, ThresholdEvaluationResponse> result;
 }

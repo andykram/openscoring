@@ -5,10 +5,7 @@ package org.openscoring.server;
 
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.Timed;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.common.collect.Table;
+import com.google.common.collect.*;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.google.inject.name.Named;
@@ -22,6 +19,8 @@ import org.jpmml.manager.PMMLManager;
 import org.openscoring.common.EvaluationRequest;
 import org.openscoring.common.EvaluationResponse;
 import org.openscoring.common.SummaryResponse;
+import org.openscoring.server.responses.ThresholdEvaluationResponse;
+import org.openscoring.server.responses.ThresholdSummaryResponse;
 import org.openscoring.server.responses.VersionedEvaluationResponse;
 import org.openscoring.server.responses.VersionedSummaryResponse;
 
@@ -105,9 +104,7 @@ public class ModelService {
     @Timed
 	@Produces(MediaType.APPLICATION_JSON)
 	public List<String> getDeployedIds(){
-		List<String> result = new ArrayList<String>(cache.rowKeySet());
-
-		return result;
+        return new ArrayList<String>(cache.rowKeySet());
 	}
 
 	@GET
@@ -115,7 +112,7 @@ public class ModelService {
 	@Path("{id}")
 	@Produces(MediaType.APPLICATION_JSON)
 	public VersionedSummaryResponse getSummary(@PathParam("id") String id){
-        Map<Integer, PMML> modelVersions = cache.row(id);
+        final Map<Integer, PMML> modelVersions = cache.row(id);
 
 		if (modelVersions.isEmpty()) {
 			throw new NotFoundException();
@@ -124,15 +121,18 @@ public class ModelService {
         VersionedSummaryResponse response = new VersionedSummaryResponse(id);
 
         for (Map.Entry<Integer, PMML> modelVersion: modelVersions.entrySet()) {
-            SummaryResponse modelResponse = new SummaryResponse();
+            final ThresholdSummaryResponse modelResponse = new ThresholdSummaryResponse();
+            final PMML model = modelVersion.getValue();
+            final Threshold threshold = getThreshold(model.getHeader());
 
             try {
-                PMMLManager pmmlManager = new PMMLManager(modelVersion.getValue());
+                PMMLManager pmmlManager = new PMMLManager(model);
                 Evaluator evaluator = (Evaluator)pmmlManager.getModelManager(null,
                                                                              ModelEvaluatorFactory.getInstance());
                 modelResponse.setActiveFields(toValueList(evaluator.getActiveFields()));
                 modelResponse.setPredictedFields(toValueList(evaluator.getPredictedFields()));
                 modelResponse.setOutputFields(toValueList(evaluator.getOutputFields()));
+                modelResponse.setThreshold(threshold);
             } catch (Exception ignored) {}
 
             response.setSummaryResponse(modelVersion.getKey(), modelResponse);
@@ -149,7 +149,7 @@ public class ModelService {
 	@Produces(MediaType.APPLICATION_JSON)
 	public VersionedEvaluationResponse evaluate(@PathParam("id") String id, EvaluationRequest request) {
         Map<Integer, PMML> versions = cache.row(id);
-        Map<Integer, EvaluationResponse> modelResponses = Maps.newHashMap();
+        Map<Integer, ThresholdEvaluationResponse> modelResponses = Maps.newHashMap();
 
         VersionedEvaluationResponse response = new VersionedEvaluationResponse(id);
 
@@ -217,14 +217,14 @@ public class ModelService {
 			for(EvaluationRequest request : requests){
                 log.info("Evaluating request parameters {} with UUID {}", request.getParameters(), request.getId());
 
-				EvaluationResponse response = evaluate(evaluator, request);
+				ThresholdEvaluationResponse response = ThresholdEvaluationResponse.fromEvaluationResponse(evaluate(evaluator,
+                                                                                                                   request));
+                response.setThreshold(threshold);
 
-                Map<Integer, EvaluationResponse> responseMap = Maps.newHashMap();
-                responseMap.put(version, response);
+                Map<Integer, ThresholdEvaluationResponse> responseMap = ImmutableMap.of(version, response);
 
                 VersionedEvaluationResponse versionedResponse = new VersionedEvaluationResponse(id);
                 versionedResponse.setResult(responseMap);
-                versionedResponse.setThreshold(threshold);
 
                 log.info("Evaluated model {} for request {} with result {} with UUID {}", id,
                          request.getParameters(),
