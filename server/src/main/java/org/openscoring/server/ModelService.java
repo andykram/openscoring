@@ -37,6 +37,7 @@ import java.util.*;
 @Path("model")
 public class ModelService {
 
+    private static final String SCORE_KEY_NAME = "score";
     private final Table<String, Integer, PMML> cache;
 
     @Inject
@@ -206,19 +207,42 @@ public class ModelService {
 
         final Threshold threshold = getThreshold(pmml.getHeader());
 
-		List<VersionedEvaluationResponse> responses = Lists.newArrayList();
+		final List<VersionedEvaluationResponse> responses = Lists.newArrayList();
 
 		try {
-			PMMLManager pmmlManager = new PMMLManager(pmml);
+			final PMMLManager pmmlManager = new PMMLManager(pmml);
 
-			Evaluator evaluator = (Evaluator)pmmlManager.getModelManager(null,
-                                                                         ModelEvaluatorFactory.getInstance());
+			final Evaluator evaluator = (Evaluator)pmmlManager.getModelManager(null,
+                                                                               ModelEvaluatorFactory.getInstance());
 
-			for(EvaluationRequest request : requests){
-                log.info("Evaluating request parameters {} with UUID {}", request.getParameters(), request.getId());
+			for(EvaluationRequest request : requests) {
+                final Map<String, ?> parameters = request.getParameters();
+                final List<Map.Entry<String, ?>> toTransform = Lists.newArrayListWithCapacity(parameters.size());
+
+                for (Map.Entry<String, ?> param : parameters.entrySet()) {
+                    if (param.getValue() instanceof Boolean) {
+                        toTransform.add(param);
+                    }
+                }
+
+                log.info("Received request parameters {} with UUID {}", request.getParameters(), request.getId());
+
+                for (Map.Entry<String, ?> param : toTransform) {
+                    Boolean boolValue = (Boolean) param.getValue();
+                    ((Map)parameters).put(param.getKey(), Boolean.toString(boolValue));
+                }
+
+                log.info("Evaluating request parameters {} with UUID {}", parameters, request.getId());
 
 				ThresholdEvaluationResponse response = ThresholdEvaluationResponse.fromEvaluationResponse(evaluate(evaluator,
                                                                                                                    request));
+                String scoreKey = threshold.getScoreKey();
+                Map<String, Object> result = response.getResult();
+
+                if ((scoreKey != null) && (result.containsKey(scoreKey))) {
+                    result.put(SCORE_KEY_NAME, result.get(scoreKey));
+                }
+
                 response.setThreshold(threshold);
 
                 Map<Integer, ThresholdEvaluationResponse> responseMap = ImmutableMap.of(version, response);
@@ -227,7 +251,7 @@ public class ModelService {
                 versionedResponse.setResult(responseMap);
 
                 log.info("Evaluated model {} for request {} with result {} with UUID {}", id,
-                         request.getParameters(),
+                         parameters,
                          response.getResult(),
                          request.getId());
 
@@ -302,17 +326,20 @@ public class ModelService {
         final List<Extension> extensions = header.getExtensions();
         Float upper = null;
         Float lower = null;
+        String scoreKey = null;
 
         try {
             for (Extension extension : extensions) {
-                if (extension.getName().equals("true_if_above")) {
-                    upper = Float.valueOf(extension.getValue());
-                } else if (extension.getName().equals("true_if_below")) {
+                if (extension.getName().equals("trueIfAbove")) {
                     lower = Float.valueOf(extension.getValue());
+                } else if (extension.getName().equals("trueIfBelow")) {
+                    upper = Float.valueOf(extension.getValue());
+                } else if (extension.getName().equals("useAsScore")) {
+                    scoreKey = extension.getValue();
                 }
             }
 
-            return new Threshold(lower, upper);
+            return new Threshold(lower, upper, scoreKey);
 
         } catch (NumberFormatException ignored) {
             return null;
